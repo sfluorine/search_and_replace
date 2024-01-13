@@ -1,0 +1,2 @@
+: foreach src/*.c |> clang -g -Wall -Wextra -c %f -o %o |> build/%B.o
+: build/*.o |> clang %f -o %o |> snr
