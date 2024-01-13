@@ -46,7 +46,7 @@ void match_strings(correction_ctx_t* ctx)
     const char* ptr = strstr(source, ctx->search);
     size_t count = 0;
 
-    while (ptr) {
+    while (ptr && count < 2048) {
         ctx->matched_strs[count++] = ptr;
         source = ptr + strlen(ctx->search);
         ptr = strstr(source, ctx->search);
