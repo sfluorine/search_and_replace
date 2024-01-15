@@ -19,14 +19,4 @@ Your machine will need a C compiler (clang, gcc, etc...) and a build system call
 Assuming you have installed it, just ```cd``` into the root of project directory and type ```tup```
 it will build the project.
 
-Command line arguments:
-
-```bash
-usage: snr <filepath> <search_string> <replace_string>
-```
-
-Example:
-
-```bash
-./snr Tupfile clang gcc
-```
+Run the program ```./snr``` and look at the usage instructions.
