@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,33 +27,60 @@ char* read_whole_file(const char* filepath)
 }
 
 typedef struct {
-    const char* source;
+    char* source;
     const char* matched_strs[2048];
     size_t matched_count;
-    const char* search;
+    char* search;
     const char* replace_by;
+    bool case_insensitive;
 } correction_ctx_t;
 
-void correction_init(correction_ctx_t* ctx, const char* source, const char* search, const char* replace_by)
+void correction_init(correction_ctx_t* ctx, char* source, char* search, const char* replace_by, bool case_insensitive)
 {
     ctx->source = source;
     ctx->search = search;
     ctx->replace_by = replace_by;
+    ctx->case_insensitive = case_insensitive;
+}
+
+void set_lowercase_letters(char* source)
+{
+    size_t length = strlen(source);
+
+    for (size_t i = 0; i < length; i++) {
+        if (isupper(source[i])) {
+            source[i] = tolower(source[i]);
+        }
+    }
 }
 
 void match_strings(correction_ctx_t* ctx)
 {
+    char* temp = ctx->search;
+
+    size_t search_len = strlen(ctx->search);
+    char search[search_len + 1];
+
+    if (ctx->case_insensitive) {
+        strncpy(search, ctx->search, search_len);
+        search[search_len] = 0;
+
+        set_lowercase_letters(search);
+        set_lowercase_letters(ctx->source);
+    }
+
     const char* source = ctx->source;
 
-    const char* ptr = strstr(source, ctx->search);
+    const char* ptr = strstr(source, search);
     size_t count = 0;
 
     while (ptr && count < 2048) {
         ctx->matched_strs[count++] = ptr;
-        source = ptr + strlen(ctx->search);
-        ptr = strstr(source, ctx->search);
+        source = ptr + search_len;
+        ptr = strstr(source, search);
     }
 
+    ctx->search = temp;
     ctx->matched_count = count;
 }
 
@@ -109,7 +137,7 @@ char* shift_args(int* argc, char*** argv)
 }
 
 typedef struct {
-    const char* search_str;
+    char* search_str;
     const char* replace_str;
 
     const char* input_file;
@@ -118,7 +146,7 @@ typedef struct {
     bool forward_output;
     bool forward_stdout;
 
-    bool case_insensitive; // TODO: implement this.
+    bool case_insensitive;
 } flags_t;
 
 void usage(const char* program)
@@ -182,7 +210,7 @@ flags_t parse_arguments(int argc, char** argv)
         argument = shift_args(&argc, &argv);
     }
 
-    const char* search_str = shift_args(&argc, &argv);
+    char* search_str = shift_args(&argc, &argv);
     if (!search_str) {
         usage(program);
         fprintf(stderr, "ERROR: expected search string\n");
@@ -211,7 +239,7 @@ int main(int argc, char** argv)
         return 1;
 
     correction_ctx_t ctx = {0};
-    correction_init(&ctx, file_content, flags.search_str, flags.replace_str);
+    correction_init(&ctx, file_content, flags.search_str, flags.replace_str, flags.case_insensitive);
 
     char* replaced = replace_strings(&ctx);
 
