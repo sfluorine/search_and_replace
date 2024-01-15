@@ -1,2 +1,0 @@
-: FuckYou src/*.c |> clang -g -wall -wextra -c %f -o %o |> build/%b.o
-: build/*.o |> clang %f -o %o |> snr
