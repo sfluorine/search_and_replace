@@ -263,6 +263,8 @@ int main(int argc, char** argv)
         } else {
             fwrite(replaced, sizeof(char), strlen(replaced), output);
         }
+
+        fclose(output);
     }
 
     free(replaced);
