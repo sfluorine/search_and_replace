@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 char* read_whole_file(const char* filepath)
 {
@@ -88,28 +89,153 @@ char* replace_strings(correction_ctx_t* ctx)
     return new_source;
 }
 
-int main(int argc, char** argv)
+void rewind_args(int* argc, char*** argv)
 {
-    if (argc < 4) {
-        fprintf(stderr, "expected arguments\n");
-        return 1;
+    *argc += 1;
+    *argv = *argv - 1;
+}
+
+char* shift_args(int* argc, char*** argv)
+{
+    if (argc == 0) {
+        return NULL;
     }
 
-    char* search = argv[2];
-    char* replace = argv[3];
+    char* current = **argv;
+    *argv = *argv + 1;
+    *argc -= 1;
 
-    char* file_content = read_whole_file(argv[1]);
+    return current;
+}
+
+typedef struct {
+    const char* search_str;
+    const char* replace_str;
+
+    const char* input_file;
+    const char* output_file;
+
+    bool forward_output;
+    bool forward_stdout;
+
+    bool case_insensitive; // TODO: implement this.
+} flags_t;
+
+void usage(const char* program)
+{
+    fprintf(stderr, "usage: %s <input_file> [flags..] <search_str> <replace_str>\n", program);
+    fprintf(stderr, "flags:\n");
+    fprintf(stderr, "   -fnostdout              don't forward the output to the stdout.\n");
+    fprintf(stderr, "   -foutput <output_file>  forward the output to file\n");
+    fprintf(stderr, "   -nocase                 case insensitive search\n");
+}
+ 
+flags_t parse_arguments(int argc, char** argv)
+{
+    flags_t flags = {
+        .search_str = NULL,
+        .replace_str = NULL,
+
+        .input_file = NULL,
+        .output_file = NULL,
+
+        .forward_output = false,
+        .forward_stdout = true,
+
+        .case_insensitive = false,
+    };
+
+    const char* program = shift_args(&argc, &argv);
+
+    const char* input_file = shift_args(&argc, &argv);
+    if (!input_file) {
+        usage(program);
+        fprintf(stderr, "ERROR: expected input file\n");
+        exit(1);
+    }
+
+    flags.input_file = input_file;
+
+    const char* argument = shift_args(&argc, &argv);
+    while (argument) {
+        if (strcmp(argument, "-fnostdout") == 0) {
+            flags.forward_stdout = false;
+        } else if (strcmp(argument, "-foutput") == 0) {
+            const char* output_file = shift_args(&argc, &argv);
+
+            if (!output_file) {
+                usage(program);
+                fprintf(stderr, "ERROR: expected output file\n");
+                exit(1);
+            }
+
+            flags.output_file = output_file;
+            flags.forward_output = true;
+        } else if (strcmp(argument, "-nocase") == 0) {
+            flags.case_insensitive = true;
+        } else {
+            // if your search string is one of this flags, then it will cause a problem...
+            rewind_args(&argc, &argv);
+            break;
+        }
+
+        argument = shift_args(&argc, &argv);
+    }
+
+    const char* search_str = shift_args(&argc, &argv);
+    if (!search_str) {
+        usage(program);
+        fprintf(stderr, "ERROR: expected search string\n");
+        exit(1);
+    }
+
+    const char* replace_str = shift_args(&argc, &argv);
+    if (!replace_str) {
+        usage(program);
+        fprintf(stderr, "ERROR: expected replace string\n");
+        exit(1);
+    }
+
+    flags.search_str = search_str;
+    flags.replace_str = replace_str;
+
+    return flags;
+}
+
+int main(int argc, char** argv)
+{
+    flags_t flags = parse_arguments(argc, argv);
+
+    char* file_content = read_whole_file(flags.input_file);
     if (!file_content)
         return 1;
 
     correction_ctx_t ctx = {0};
-    correction_init(&ctx, file_content, search, replace);
+    correction_init(&ctx, file_content, flags.search_str, flags.replace_str);
 
     char* replaced = replace_strings(&ctx);
-    if (!replaced)
-        return 1;
 
-    printf("%s", replaced);
+    if (flags.forward_stdout) {
+        if (!replaced) {
+            printf("%s", file_content);
+        } else {
+            printf("%s", replaced);
+        }
+    }
+
+    if (flags.forward_output) {
+        FILE* output = fopen(flags.output_file, "w");
+        if (!output) {
+            fprintf(stderr, "ERROR: cannot write to file\n");
+            return 1;
+        }
+
+        if (!replaced) {
+            fwrite(file_content, sizeof(char), strlen(file_content), output);
+        } else {
+            fwrite(replaced, sizeof(char), strlen(replaced), output);
+        }
+    }
 
     free(replaced);
     free(file_content);
